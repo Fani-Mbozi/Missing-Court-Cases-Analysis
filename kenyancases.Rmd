@@ -1,0 +1,221 @@
+---
+title: "Missing Cases Kenya Analysis"
+author: "FM"
+date: 
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = F, eval=F}
+#setwd('/Users/fanisimbozi/Desktop/misc')
+```
+
+
+```{r, echo = F, eval=T}
+data = readRDS("seqData.rds")
+```
+
+```{r, echo = F, eval=T}
+final = readRDS("Kenya_Appeals_Output.Rds")
+```
+
+## Introduction
+
+Kenyan legal documentation on criminal appeal cases have been made widely accessible online and are presented in a standardised format that includes key details including the unique court case number (in the numeric sequence of court cases each year) for every year (1997-2017) and for 28 district courts. An example of can be found here: [link](http://kenyalaw.org/caselaw/cases/view/97059). 
+These relevant court details were scraped to create the following database:
+
+```{r, echo = TRUE, eval=T, warning=FALSE, message=FALSE}
+head(data, 3)
+```
+
+**Objectives**
+
+Firstly, *sorting* all of the criminal appeals *by year and district*. And secondly, creating a dataframe that identifies missing cases in the numerated sequence of court appeals for each year and court station district. The final output would look like the below dataframe:  
+
+```{r, echo = FALSE, eval=T, warning=FALSE, message=FALSE}
+head(final, 5)
+```
+
+
+## OVERVIEW OF KEY STEPS AND PROCESS 
+
+1. Create a new `year` variable using the years from the criminal appeal statement. e.g. "Criminal Appeal 78 of `2013`". 
+2. Create a `case number` variable by isolating the appeal number in the criminal appeal statement e.g. this is `78` in the statement "Criminal Appeal `78` of 2013".
+3. Put the new 'year' and 'case number' variables in a new dataframe along with the relevant court district. 
+4. Use this new dataframe to create a loop that sorts thorugh each district and year to check if there are missing case numbers and form the 'exists' variable. 
+
+**PROCESS**
+```{r, echo = F, eval=T, warning=FALSE, message=FALSE}
+library(stringr)
+library(tidyr)
+```
+
+```{r, echo = F, eval=T}
+
+#Removing the non-digit elements of string so that we get only the 'case' and 'year' numbers.
+data$clean<-gsub("\\D+", " ", data$Case.Number)
+
+#Triming the String:
+data$clean<-str_squish(data$clean)
+
+#Separating the 'case' and 'year' elements. 
+data$clean<-str_split(data$clean," ")
+
+# Creating the year column
+data$year<-lapply(data$clean,tail,1)
+
+#Unlisting the year column
+data$year<-as.numeric(unlist(data$year))
+
+```
+
+**STEP 1: Addressing the issue of missing years**
+
+While there is a year variable called 'case_no_year' in the original dataframe, a lot of it's entries are missing (NA's), which would be a problem when trying to sort the appeals by year in future steps. To resolve this I firstly create a column in the dataframe called `clean` that extracts all the numbers from the criminal appeal statement. Secondly I create the needed `year` column using the *tail* (last) items of the `clean` column, which are almost always the appeal year. 
+
+I can do this because all the criminal appeal statements follow the format: "criminal appeal `specific case number` of `specific year of appeal`". 
+
+*Below is a preview of the `clean` column. The new `year` variable is just the last element of everything in the `clean` column.*
+```{r, echo = F, eval=T}
+head(data$clean, 2)
+```
+
+
+**STEP 2: Creating a 'Cases' variable.** 
+This provides the unique sequential numbers that the cases for each district and years were labeled with. Going back to the criminal appeal statements, I first I remove all the year-related digits, and then extract the remaining case-related digits into a seperate column. 
+
+
+
+```{r, echo = F, eval=T}
+
+data$Case.Number = str_replace_all(data$Case.Number,"(19|20)[0-9][0-9]", " " )
+data$Case.Number = str_replace(data$Case.Number," (19|20)[0-9][0-9]", " " )
+data$Case.Number = str_replace(data$Case.Number,"(19|20)[0-9][0-9] ", " " )
+```
+
+
+```{r, echo = F, eval=T}
+#remove anomolies from string
+data$Case.Number = str_replace(data$Case.Number," (0)[1-9]$", " " )
+```
+
+```{r, echo = F, eval=T}
+# create case column 
+data$case = str_extract_all(data$Case.Number ,"[:digit:]{1,}")
+```
+
+```{r, echo = F, eval=T}
+head(data$case, 3)
+```
+
+```{r, echo = F, eval=T}
+f_output<-data.frame(court.station=data$county)
+f_output$court.station<-str_to_upper(f_output$court.station)
+```
+
+```{r, echo = F, eval=T}
+#extract case no. to output
+f_output$case.number<-data$case
+```
+
+```{r, echo = F, eval=T}
+#extract year to output
+f_output$year<-data$year
+```
+
+**Step 3: Creating a draft 'output' dataframe with only court station, case number and year.**  
+
+The new 'output' dataframe is simply buit from the newly created `year` and `case number` variables and the previously available `county` variable:
+
+```{r, echo = F, eval=T}
+head(f_output, 7)
+```
+
+**Problem:** While the extraction metods use in Steps 1 and 2 were mostly efficient, there are some criminal appeal statements that do not follow that standard format of: "criminal appeal `specific case number` of `specific year of appeal`". This is especially true in the case of the extracted year values. To investigate the types of issues that were present in the newly created 'output' dataframe, I checked the `year` column for anomolies that have less than or more than a standard 4 digit value for `year`. This is discussed in the *'Anomolies related to missing and incorrect years'* section.
+
+
+```{r, echo = F, eval=T}
+
+#fixing years with -"02, 04 etc "
+f_output$year[str_detect(f_output$year, "^(0)[1-9]")] <- paste0("20",f_output$year[str_detect(f_output$year, "^(0)[1-9]")])
+
+f_output$year[str_detect(f_output$year, "^(1)[1-9]$")] <- paste0("20",f_output$year[str_detect(f_output$year, "^(1)[1-9]$")])
+```
+
+
+ 
+```{r, echo = F, eval=F}
+
+#Edit Codes (2-digit dates)
+f_output[1351 , 3] = 2007 #1 EMBU
+f_output[1351,] #check
+
+f_output[1707, 3] = 2008 #2 Mombassa
+f_output[1707,]
+
+f_output[1834, 3] = 2005 #3 EMBU
+f_output[1834,]
+
+f_output[1843, 3] = 2006 #4 KAKAMEGA
+f_output[1843,]
+
+f_output[1852, 3] = 2008 #5 Mombassa
+f_output[1852,]
+
+f_output[1880, 3] = 2008 #6 Mombassa
+f_output[1880,]
+
+#Edit Codes (3-digit dates)
+
+f_output[825 , 3] = 2005 #1 EMBU
+f_output[825,] 
+
+#Problem: There is mix-up with the case numbers and years for the below observation. For the time being I allocated this row to have year == '9' so that I could fix it when addressing other rows with single digit year values. 
+
+f_output[1626 , 3] = 9 #2 NAIROBI: year
+f_output[1626,] 
+
+f_output[1777 , 3] = 2006 #3 MOMBASA
+f_output[1777,] 
+
+f_output[1845 , 3] = 2005 #4 NYERI         
+f_output[1845,]
+
+f_output[1971 , 3] = 2007 #5 MOMBASA                  
+f_output[1971,]
+
+#Problem: (the online document itself has no full input for the actual year)
+f_output[4880 , 3] = NA #6 EMBUA                  
+f_output[4880,]
+
+#Edit Codes (1-digit dates: the easy fixes)
+
+f_output[493 , 3] = 2004 #1 BUNGOMA                         
+f_output[493,]
+
+f_output[1871 , 3] = 2008  # KAKAMEGA                             
+f_output[1871,]
+```
+
+
+ 
+```{r, echo = F, eval=F}
+#Unnesting final data set.
+#*Step 4: Creating a Loop to check missing and existing case numbers**
+
+f_output = unnest(f_output, case.number)
+```
+
+```{r, echo = TRUE, eval=F}
+
+```
+
+```{r, echo = TRUE, eval=F}
+
+```
+
+
+

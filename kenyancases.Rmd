@@ -24,11 +24,20 @@ final = readRDS("Kenya_Appeals_Output.Rds")
 
 ## Introduction
 
-Kenyan legal documentation on criminal appeal cases have been made widely accessible online and are presented in a standardised format that includes key details including the unique court case number (in the numeric sequence of court cases each year) for every year (1997-2017) and for 28 district courts. An example of can be found here: [link](http://kenyalaw.org/caselaw/cases/view/97059). 
-These relevant court details were scraped to create the following database:
+Kenyan legal documentation on criminal appeal cases have been made publically accessible online and are presented in a standardised format that includes key details including the unique court case number (in the numeric sequence of court cases each year) for every year (1997-2017) and for 28 district courts. An example of can be found here: [link](http://kenyalaw.org/caselaw/cases/view/97059). 
 
-```{r, echo = TRUE, eval=T, warning=FALSE, message=FALSE}
-head(data, 3)
+<center>
+
+![A visual preview of the court documents](/Users/fanisimbozi/Desktop/misc/Missing Cases/Criminal Appeal.png){width=50%}
+
+</center>
+<br>
+<br>
+These relevant court details were compiled to create database that looks like the following:
+
+```{r, echo = TRUE, eval=T, warning=FALSE, message=FALSE, results='asis'}
+library(knitr)
+kable(head(data, 4))
 ```
 
 **Objectives**
@@ -46,6 +55,8 @@ head(final, 5)
 2. Create a `case number` variable by isolating the appeal number in the criminal appeal statement e.g. this is `78` in the statement "Criminal Appeal `78` of 2013".
 3. Put the new 'year' and 'case number' variables in a new dataframe along with the relevant court district. 
 4. Use this new dataframe to create a loop that sorts thorugh each district and year to check if there are missing case numbers and form the 'exists' variable. 
+
+<br>
 
 **PROCESS**
 ```{r, echo = F, eval=T, warning=FALSE, message=FALSE}
@@ -85,7 +96,7 @@ head(data$clean, 2)
 
 
 **STEP 2: Creating a 'Cases' variable.** 
-This provides the unique sequential numbers that the cases for each district and years were labeled with. Going back to the criminal appeal statements, I first I remove all the year-related digits, and then extract the remaining case-related digits into a seperate column. 
+This provides the unique sequential numbers that the cases for each district and years were labeled with. Going back to the criminal appeal statements, I first I remove all the year-related digits, and then extract the remaining case-related digits into a separate column. 
 
 
 
@@ -111,42 +122,237 @@ data$case = str_extract_all(data$Case.Number ,"[:digit:]{1,}")
 head(data$case, 3)
 ```
 
+<br>
+
+**Challenge 1:** While the extraction methods use in Steps 1 and 2 were mostly efficient, there are some criminal appeal statements that do not follow that standard format of: "criminal appeal `specific case number` of `specific year of appeal`".
+
+To illustrate this problem below are examples of four anomalous formats of the criminal appeal statements that I had to resolve:
+
+```{r, echo=T, eval=T}
+
+#Compound appeal statements that use special characters.
+head(data$Case.Number[str_detect(data$Case.Number, ".*&.*&")], 3)
+
+#Compound appeal statements that use 'of' multiple times. 
+head(data$Case.Number[str_detect(data$Case.Number, ".*of.*of")], 3)
+```
+
+```{r, echo=T, eval=T}
+#Truncated appeal statements
+head(data$Case.Number[str_detect(data$Case.Number, "-")],3)
+```
+
+```{r, echo=T, eval=T}
+#Renamed appeal statements that containing 'formerly' and a second set of case numbers
+head(data$Case.Number[str_detect(data$Case.Number, "(?<=formerly).")], 3)
+```
+
+<br>
+
+**Solution**: I used a combination of string manipulation (using regex) and manual editing to resolve each instance of anomalous appeal statements. The goal was to collect all the listed case numbers in the criminal appeal statements so that we had the best picture of which court cases we had (in the dataset) for each year of court data. The cleaned version of this case variable is previewed below, where appeal statements with many case numbers have those numbers truncated into a list. 
+
 ```{r, echo = F, eval=T}
-f_output<-data.frame(court.station=data$county)
+clean_data = readRDS("cleaned_data.rds")
+```
+
+```{r, echo = F, eval=T}
+clean_data$case[65:70]
+```
+
+
+```{r, echo=F, eval=F}
+#Below are the id's for error rows
+C = c(2908,
+      5026,
+      5201,
+      5203,
+      5245,
+      5264,
+      5302,
+      5853,
+      6436,
+      6798,
+      12506,
+      409,
+      2293,
+      2471,
+      2496,
+      3580,
+      3857,
+      3877,
+      4246,
+      5026,
+      9576,
+      11054,
+      11439,
+      12506,
+      12853,
+      14552,
+      15075,
+      15756,
+      17208,
+      17637,
+      18220,
+      19638,
+      20248)
+
+# identifying row numbers for edits
+which(data$id %in% C)
+
+#Corrections codes:
+data[1670,]
+data[1670,2] = 'criminal appeal 163 & 164 of 2005 ...'
+
+data[231,]
+data[231,2] = 'criminal appeal nos 922 of 2004 ...'
+
+data[1322,]
+data[1322,2] = 'criminal appeal 116 of 2006 ...'
+
+data[1433,]
+data[1433,2] = 'criminal appeal 249 of 2004 ...'
+
+data[1451,]
+data[1451,2] = 'criminal appeal 593 of 2006 ...'
+
+data[2008,]
+data[2008,2] = 'criminal appeal 75 of 2006 ...'
+
+data[2121,]
+data[2121,2] = 'criminal appeal 152 of 2007 ...'
+
+data[2132,]
+data[2132,2] = 'criminal appeal 202b of 2008 ...'
+
+data[2327,]
+data[2327,2] = 'criminal appeal 208 of 2009 ...'
+
+data[2747,]
+data[2747,2] = 'criminal appeal 69 & 69b, 141 & 96 of 2009 ...'
+
+data[2853,]
+data[2853,2] = 'criminal appeal 2 of 2009 ...'
+
+data[2854,]
+data[2854,2] = 'criminal appeal 122 of 2008 ...'
+
+data[2884,]
+data[2884,2] = 'criminal appeal 32 of 2009 ...'
+
+data[2899,]
+data[2899,2] = 'criminal appeal 96 of 2008 ...'
+
+data[2927,]
+data[2927,2] = 'criminal appeal 9 of 2010 ...'
+
+data[3227,]
+data[3227,2] = 'criminal appeal 268 of 2009 ...'
+
+data[3507,]
+data[3507,2] = 'criminal appeal 66 of 2010 ...'
+
+data[3707,]
+data[3707,2] = 'criminal appeal 9 of 2000 ...'
+
+data[5237,]
+data[5237,2] = 'criminal appeal nos 9 of 2010 ...'
+
+data[5970,]
+data[5970,2] = 'criminal appeals 114 of 2012 ...'
+
+data[6172,]
+data[6172,2] = 'criminal appeals 320 of 2007 ...'
+
+data[6694,]
+data[6694,2] = 'criminal appeal nos 153, 175, 174, 173, 171, 168, 181, 176, 169, 172 of 2014 ...'
+
+data[6831,]
+data[6831,2] = 'criminal appeal 163, 167, 166, 164, 165 of 2013 ...'
+
+data[7707,]
+data[7707,2] = 'criminal appeals 126 of 2015 ...'
+
+data[7882,]
+data[7882,2] = 'criminal appeals 67 of 2015 ...'
+
+data[8271,]
+data[8271,2] = 'criminal appeal nos 13 of 2014 ...'
+
+data[9077,]
+data[9077,2] = 'criminal appeal 194 of 2013 ...'
+
+data[9226,]
+data[9226,2] = 'criminal appeal 105 of 2016 ...'
+
+data[9503,]
+data[9503,2] = 'criminal appeals 5 of 2016 ...'
+
+data[10299,]
+data[10299,2] = 'criminal appeal 160 of 2015 ...'
+
+data[10640,]
+data[10640,2] = 'criminal appeal 198 of 2015 ...'
+```
+
+```{r, echo=F, eval=F}
+
+data[2673,]
+data[2673, 2] = 'criminal appeal 80, 81, 82, 83, 84, 85 of 2008'
+
+data[4569,]
+data[4569, 2] = 'criminal appeal 155, 156, 157 of 2011'
+
+data[5389,]
+data[5389, 2] = 'criminal appeal 166 ,167, 168, 169, 170, 171, 172 of 2012 (consolidated)'
+```
+
+```{r, echo = F, eval=T}
+f_output<-data.frame(court.station=clean_data$county)
 f_output$court.station<-str_to_upper(f_output$court.station)
 ```
 
 ```{r, echo = F, eval=T}
 #extract case no. to output
-f_output$case.number<-data$case
+f_output$case.number<-clean_data$case
 ```
 
 ```{r, echo = F, eval=T}
 #extract year to output
-f_output$year<-data$year
+f_output$year<-clean_data$year
 ```
 
 **Step 3: Creating a draft 'output' dataframe with only court station, case number and year.**  
 
-The new 'output' dataframe is simply buit from the newly created `year` and `case number` variables and the previously available `county` variable:
+Now that I had the cleanest version of case number and case year from the original data, I create an intermediate dataframe, subseting only the information that would be needed for the function that creates the final desired final dataset. The intermediate dataframe is built from the newly created `year` and `case number` variables and the previously available `county` variable:
 
 ```{r, echo = F, eval=T}
 head(f_output, 7)
 ```
+<br>
 
-**Problem:** While the extraction metods use in Steps 1 and 2 were mostly efficient, there are some criminal appeal statements that do not follow that standard format of: "criminal appeal `specific case number` of `specific year of appeal`". This is especially true in the case of the extracted year values. To investigate the types of issues that were present in the newly created 'output' dataframe, I checked the `year` column for anomolies that have less than or more than a standard 4 digit value for `year`. This is discussed in the *'Anomolies related to missing and incorrect years'* section.
+**Challenge 2**. Even in this cleaner dataset, there are anomalous entries. This is especially true in the case of the extracted year values. To investigate the types of issues that were present in the intermediate dataframe. I first checked the `year` column for anomolies that have less than or more than a standard 4 digit value for `year`. This is exemplified by the findings below and resolved using simple string manipulation.
 
+```{r, echo = T, eval=T}
+f_output$year[str_detect(f_output$year, "^(0)[1-9]")] 
+```
 
-```{r, echo = F, eval=T}
+```{r, echo = T, eval=T}
 
-#fixing years with -"02, 04 etc "
+#fixing years with -"02", "04" etc 
 f_output$year[str_detect(f_output$year, "^(0)[1-9]")] <- paste0("20",f_output$year[str_detect(f_output$year, "^(0)[1-9]")])
 
+#fixing years with - "16" and "13"
 f_output$year[str_detect(f_output$year, "^(1)[1-9]$")] <- paste0("20",f_output$year[str_detect(f_output$year, "^(1)[1-9]$")])
 ```
 
+Other examples of the code used to identify anomalous `year` values:
+```{r, echo=T, eval=T}
+f_output$year[str_detect(f_output$year, "^[:digit:]{1}$")] # One digit year error
+# Two digit year error  : f_output$year[str_detect(f_output$year, "^[:digit:]{2}$")] 
+# Three digit year error: f_output$year[str_detect(f_output$year, "^[:digit:]{3}$")]
+```
 
- 
+
 ```{r, echo = F, eval=F}
 
 #Edit Codes (2-digit dates)
@@ -199,22 +405,60 @@ f_output[493,]
 f_output[1871 , 3] = 2008  # KAKAMEGA                             
 f_output[1871,]
 ```
+<br>
+**Step 4: Un-nesting:** This was a crucial intermediate step that allowed me to reshape my multi-number `case` variables into long-form data (i.e. having an individual row for each court case that was part of a combined appeal statement - so far combined cases have been stored in lists like the one below). 
 
-
+```{r, echo=T, eval=T}
+f_output$case[70]
+```
+This was done using the function **unnest**. This step is important because creating an individual row for every case allows me to iterate through the entire dataset to look for gaps in the sequence of case numbers. 
  
-```{r, echo = F, eval=F}
+```{r, echo = T, eval=T}
 #Unnesting final data set.
-#*Step 4: Creating a Loop to check missing and existing case numbers**
+F_output = unnest(f_output, case.number)
+```
+<br>
 
-f_output = unnest(f_output, case.number)
+**Step 4: Loop to check for missing cases:**  The final step is to create a nested for loop that checks the sequence of the case numbers for every district in every year to identify gaps. The function below does just that and I outline each step of what the loop is doing for clarity. 
+```{r, echo = TRUE, eval=T}
+#CONVERTING YEAR AND CASE INTO NUMBERS 
+F_output$case.number = as.numeric(F_output$case.number)
+F_output$year = as.numeric(F_output$year)
+
+#LOOP CREATING THE 'EXISTS' COLUMN 
+
+final_data = list()
+for(court in unique(F_output$court.station)){                           #looping through districts in F_output
+  court_output = subset(F_output, str_detect(F_output$court.station, court))    #assigning a district label
+  for(yr in unique(court_output$year)[!is.na(unique(court_output$year))]){      #looping through each year 
+    court_year_output = subset(court_output, year == yr)                        #assigning a year label
+    
+    L3 = 1:max(court_year_output$case.number) #find the maximum value case number for the given year in the given district and count sequentially from 1 to that maximum.      
+    
+    L1 = rep(court, length(L3))  #attach the district label to each counted item                            
+    L2 = rep(yr, length(L3))     #attach the year label to each counted item
+    
+    L4 = L3 %in% court_year_output$case.number #check if the sequential list of court cases (L3) is contained within my intermediate data frame (f_output) for the given year and district. Create a new variable with this check.
+    
+    final_data[[paste0(court, yr)]] = data.frame(L1,L2,L3,L4)                   #combine all function outputs  
+  }
+}
+
+Final_thing = dplyr::bind_rows(final_data)
+
+#RENAMING VARIABLES 
+colnames(Final_thing)[1] <- "court.station"
+colnames(Final_thing)[2] <- "year"
+colnames(Final_thing)[3] <- "case.number"
+colnames(Final_thing)[4] <- "exists"
+
+#TURNING LOGICAL INTO 0/1 VALUES
+Final_thing$exists = as.numeric(Final_thing$exists)
 ```
 
-```{r, echo = TRUE, eval=F}
-
-```
-
-```{r, echo = TRUE, eval=F}
-
+**Preview of the final dataset**
+```{r, echo = TRUE, eval=T}
+head(Final_thing, 10)
 ```
 
 
